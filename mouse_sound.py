@@ -4,8 +4,10 @@
 支持 MP3 / WAV（MCI + winsound），不弹窗、不卡鼠标
 """
 import ctypes
+import atexit
 import configparser
 import os
+import shutil
 import sys
 import time
 import winsound
@@ -189,10 +191,30 @@ class App:
             return
         self._running = False
         self.uninstall_hook()
+        # 关闭 MCI 资源，避免退出时残留句柄占用临时音效文件
+        _mci_send("close mouse_sound")
         print("[mouse-sound] 监听已停止")
 
     def test_sound(self):
         self._test()
+
+
+def cleanup_meipass():
+    """打包环境退出时，主动删除 PyInstaller 临时解压目录（_MEIPASS）。
+    该目录是 Python 进程启动时生成的，关闭程序后系统会自行清理，
+    但这里显式删除可立即释放磁盘空间。"""
+    if not getattr(sys, "frozen", False):
+        return
+    meipass = getattr(sys, "_MEIPASS", None)
+    if not meipass or not os.path.isdir(meipass):
+        return
+    # 等 MCI 线程释放句柄
+    time.sleep(0.15)
+    try:
+        shutil.rmtree(meipass, ignore_errors=True)
+        print(f"[mouse-sound] 已清理临时解压目录: {meipass}")
+    except Exception as e:
+        print(f"[mouse-sound] 清理临时目录失败: {e}")
 
 
 # ── GUI ───────────────────────────────────────────────────────────────
@@ -294,6 +316,8 @@ def run_gui(app: App, config_path: str):
         if app.audio_file and "_MEI" not in app.audio_file:
             app.save_config(config_path)
         root.destroy()
+        # 程序退出时主动清理 PyInstaller 临时解压目录
+        cleanup_meipass()
 
     # ── 自定义标题栏（无边框窗口需要自己画，且支持拖动）──
     titlebar = tk.Frame(root, bg=title_bg, cursor="fleur")
@@ -434,7 +458,10 @@ def main():
             print("\n[大狗叫] 正在退出…")
         finally:
             app.stop()
+            cleanup_meipass()
     else:
+        # 注册全局退出兜底：即使 GUI 没调 cleanup_meipass，进程退出时也清理
+        atexit.register(cleanup_meipass)
         run_gui(app, config_path)
 
 
