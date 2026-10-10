@@ -1,0 +1,21 @@
+# Python 缓存
+__pycache__/
+*.py[cod]
+
+# 本地虚拟环境
+.venv/
+
+# PyInstaller 打包中间产物
+build/
+
+# 运行日志
+dist/debug.log
+debug.log
+
+# 旧的 debug 打包配置（保留主 spec）
+大狗叫_debug.spec
+
+# 便携版 git（本机临时下载，非项目文件）
+.gitportable/
+.git_bootstrap.py
+.git_list.py
